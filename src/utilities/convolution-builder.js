@@ -5,7 +5,6 @@ export default class ConvolutionBuilder {
       height: null,
       inWidth: 9,
       inHeight: 9,
-      filterCount: 3,
       depth: 3,
       stride: 3,
       padding: 0
@@ -29,9 +28,9 @@ export default class ConvolutionBuilder {
     this.outWidth = Math.floor((this.width + this.padding * 2 - this.width) / this.stride + 1);
     this.outHeight = Math.floor((this.height + this.padding * 2 - this.height) / this.stride + 1);
 
-    for(let i = 0; i < this.filterCount; i++) {
-      this.filters.push(new Float32Array(this.width * this.height * this.depth));
-      this.filterDeltas.push(new Float32Array(this.width * this.height * this.depth));
+    for(let i = 0; i < this.depth; i++) {
+      this.filters.push(new Float32Array3D(this.width, this.height, this.depth));
+      this.filterDeltas.push(new Float32Array3D(this.width, this.height, this.depth));
     }
   }
 
@@ -128,33 +127,43 @@ export default class ConvolutionBuilder {
       eachConvolve,
       afterConvolve } = options;
 
-    for (let d = 0; d < this.depth; d++) {
+    for (let d = 0; d < depth; d++) {
       eachFilter(d);
+      const filter = this.filters[d];
       let y = -padding;
-      for (let ay = 0; ay < outHeight; y += stride, ay++) {
+      for (let outerY = 0; outerY < outHeight; y += stride, outerY++) {
         let x = -padding;
-        for (let ax = 0; ax < outWidth; x += stride, ax++) {
+        for (let outerX = 0; outerX < outWidth; x += stride, outerX++) {
           // convolve centered at this particular location
-          const vIndex = (width * ay) + x * depth + d;
-          beforeConvolve(vIndex, ay, ax, d);
-          for (let fy = 0; fy < height; fy++) {
+          const vIndex = (width * outerY) + x * depth + d;
+          beforeConvolve(vIndex, outerY, outerX, d);
+          for (let filterY = 0; filterY < filter.height; filterY++) {
             // coordinates in the original input array coordinates
-            let oy = y + fy;
-            for (let fx = 0; fx < width; fx++) {
-              let ox = x + fx;
-              if (oy >= 0 && oy < height && ox >= 0 && ox < width) {
-                for (let fd = 0; fd < depth; fd++) {
+            let innerY = y + filterY;
+            for (let filterX = 0; filterX < filter.width; filterX++) {
+              let innerX = x + filterX;
+              if (innerY >= 0 && innerY < filter.height && innerX >= 0 && innerX < width) {
+                for (let filterDepth = 0; filterDepth < filter.depth; filterDepth++) {
                   eachConvolve(
-                    ((width * fy) + fx) * depth + fd,
-                    ((width * oy) + ox) * depth + fd
+                    ((filter.width * filterY) + filterX) * filter.depth + filterDepth,
+                    ((width * innerY) + innerX) * filter.depth + filterDepth
                   );
                 }
               }
             }
           }
-          afterConvolve(vIndex, ax, ay, d);
+          afterConvolve(vIndex, outerX, outerY, d);
         }
       }
     }
+  }
+}
+
+class Float32Array3D extends Float32Array {
+  constructor(width, height, depth) {
+    super(width * height * depth);
+    this.width = width;
+    this.height = height;
+    this.depth = depth;
   }
 }
