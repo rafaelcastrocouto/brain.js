@@ -1,4 +1,4 @@
-export default class ConvolutionBuilder {
+export default class Convolution {
   static get defaults() {
     return {
       width: 9,
@@ -12,7 +12,7 @@ export default class ConvolutionBuilder {
   }
 
   constructor(settings) {
-    Object.assign(this, ConvolutionBuilder.defaults, settings);
+    Object.assign(this, Convolution.defaults, settings);
     this.runKernel = null;
     this.runBackpropagateKernel = null;
     this.filters = [];
@@ -32,6 +32,8 @@ export default class ConvolutionBuilder {
       this.filters.push(new Float32Array3D(this.width, this.height, this.depth));
       this.filterDeltas.push(new Float32Array3D(this.width, this.height, this.depth));
     }
+
+    this.build();
   }
 
   build() {
@@ -167,3 +169,8 @@ class Float32Array3D extends Float32Array {
     this.depth = depth;
   }
 }
+
+
+var c = new Convolution();
+c.build();
+console.log(c.runKernel.toString());
