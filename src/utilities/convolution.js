@@ -169,8 +169,3 @@ class Float32Array3D extends Float32Array {
     this.depth = depth;
   }
 }
-
-
-var c = new Convolution();
-c.build();
-console.log(c.runKernel.toString());
