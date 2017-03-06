@@ -40,9 +40,9 @@ var _zeros = require('../utilities/zeros');
 
 var _zeros2 = _interopRequireDefault(_zeros);
 
-var _vocab = require('../utilities/vocab');
+var _dataFormatter = require('../utilities/data-formatter');
 
-var _vocab2 = _interopRequireDefault(_vocab);
+var _dataFormatter2 = _interopRequireDefault(_dataFormatter);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
@@ -89,8 +89,8 @@ var RNN = function () {
         equationConnections: []
       };
 
-      if (this.vocab !== null) {
-        this.inputSize = this.inputRange = this.outputSize = this.vocab.characters.length;
+      if (this.dataFormatter !== null) {
+        this.inputSize = this.inputRange = this.outputSize = this.dataFormatter.characters.length;
       }
 
       if (this.json) {
@@ -279,8 +279,8 @@ var RNN = function () {
         log2ppl += -Math.log2(probabilities.weights[target]); // accumulate base 2 log prob and do smoothing
         cost += -Math.log(probabilities.weights[target]);
         // write gradients into log probabilities
-        logProbabilities.recurrence = probabilities.weights.slice(0);
-        logProbabilities.recurrence[target] -= 1;
+        logProbabilities.deltas = probabilities.weights.slice(0);
+        logProbabilities.deltas[target] -= 1;
       }
 
       this.totalCost = cost;
@@ -326,14 +326,14 @@ var RNN = function () {
       for (var matrixIndex = 0; matrixIndex < allMatrices.length; matrixIndex++) {
         var matrix = allMatrices[matrixIndex];
         var weights = matrix.weights,
-            recurrence = matrix.recurrence;
+            deltas = matrix.deltas;
 
         if (!(matrixIndex in this.stepCache)) {
           this.stepCache[matrixIndex] = (0, _zeros2.default)(matrix.rows * matrix.columns);
         }
         var cache = this.stepCache[matrixIndex];
         for (var i = 0; i < weights.length; i++) {
-          var r = recurrence[i];
+          var r = deltas[i];
           var w = weights[i];
           // rmsprop adaptive learning rate
           cache[i] = cache[i] * this.decayRate + (1 - this.decayRate) * r * r;
@@ -563,9 +563,9 @@ var RNN = function () {
         this[p] = options.hasOwnProperty(p) ? options[p] : defaults[p];
       }
 
-      if (options.hasOwnProperty('vocab') && options.vocab !== null) {
-        this.vocab = _vocab2.default.fromJSON(options.vocab);
-        delete options.vocab;
+      if (options.hasOwnProperty('dataFormatter') && options.dataFormatter !== null) {
+        this.dataFormatter = _dataFormatter2.default.fromJSON(options.dataFormatter);
+        delete options.dataFormatter;
       }
 
       this.bindEquation();
@@ -658,7 +658,7 @@ var RNN = function () {
         fnString = fnString.split('}');
         fnString.pop();
         // body
-        return fnString.join('}').split('\n').join('\n        ').replace('product.recurrence[i] = 0;', '').replace('product.recurrence[column] = 0;', '').replace('left.recurrence[leftIndex] = 0;', '').replace('right.recurrence[rightIndex] = 0;', '').replace('product.recurrence = left.recurrence.slice(0);', '');
+        return fnString.join('}').split('\n').join('\n        ').replace('product.deltas[i] = 0;', '').replace('product.deltas[column] = 0;', '').replace('left.deltas[leftIndex] = 0;', '').replace('right.deltas[rightIndex] = 0;', '').replace('product.deltas = left.deltas.slice(0);', '');
       }
 
       function fileName(fnName) {
@@ -681,7 +681,7 @@ var RNN = function () {
         }
       }
 
-      return new Function('input', 'maxPredictionLength', 'isSampleI', 'temperature', '\n  if (typeof input === \'undefined\') input = [];\n  if (typeof maxPredictionLength === \'undefined\') maxPredictionLength = 100;\n  if (typeof isSampleI === \'undefined\') isSampleI = false;\n  if (typeof temperature === \'undefined\') temperature = 1;\n  \n  ' + (this.vocab !== null && typeof this.formatDataIn === 'function' ? 'input = formatDataIn(input);' : '') + '\n        \n  var json = ' + jsonString + ';\n  var _i = 0;\n  var output = [];\n  var states = [];\n  var prevStates;\n  while (true) {\n    var previousIndex = (_i === 0\n        ? 0\n        : _i < input.length\n          ? input[_i - 1] + 1\n          : output[_i - 1])\n          ;\n    var rowPluckIndex = previousIndex;\n    prevStates = states;\n    states = [];\n    ' + statesRaw.join(';\n    ') + ';\n    for (var stateIndex = 0, stateMax = ' + statesRaw.length + '; stateIndex < stateMax; stateIndex++) {\n      var state = states[stateIndex];\n      var product = state.product;\n      var left = state.left;\n      var right = state.right;\n      \n      switch (state.name) {\n' + innerFunctionsSwitch.join('\n') + '\n      }\n    }\n    \n    var logProbabilities = state.product;\n    if (temperature !== 1 && isSampleI) {\n      for (var q = 0, nq = logProbabilities.weights.length; q < nq; q++) {\n        logProbabilities.weights[q] /= temperature;\n      }\n    }\n\n    var probs = softmax(logProbabilities);\n    var nextIndex = isSampleI ? sampleI(probs) : maxI(probs);\n    \n    _i++;\n    if (nextIndex === 0) {\n      break;\n    }\n    if (_i >= maxPredictionLength) {\n      break;\n    }\n\n    output.push(nextIndex);\n  }\n  ' + (this.vocab !== null && typeof this.formatDataOut === 'function' ? 'return formatDataOut(output.slice(input.length).map(function(value) { return value - 1; }))' : 'return output.slice(input.length).map(function(value) { return value - 1; })') + ';\n  \n  function Matrix(rows, columns) {\n    this.rows = rows;\n    this.columns = columns;\n    this.weights = zeros(rows * columns);\n  }\n  ' + (this.vocab !== null && typeof this.formatDataIn === 'function' ? 'function formatDataIn(input, output) { ' + toInner(this.formatDataIn.toString()).replace('this.vocab', 'json.options.vocab') + ' }' : '') + '\n  ' + (this.vocab !== null && typeof this.formatDataOut === 'function' ? 'function formatDataOut(output) { ' + toInner(this.formatDataIn.toString()).replace('this.vocab', 'json.options.vocab') + ' }' : '') + '\n  ' + (this.vocab !== null ? this.vocab.toFunctionString('json.options.vocab') : '') + '\n  ' + _zeros2.default.toString() + '\n  ' + _softmax2.default.toString().replace('_2.default', 'Matrix') + '\n  ' + _random.randomF.toString() + '\n  ' + _sampleI2.default.toString() + '\n  ' + _maxI2.default.toString());
+      return new Function('input', 'maxPredictionLength', 'isSampleI', 'temperature', '\n  if (typeof input === \'undefined\') input = [];\n  if (typeof maxPredictionLength === \'undefined\') maxPredictionLength = 100;\n  if (typeof isSampleI === \'undefined\') isSampleI = false;\n  if (typeof temperature === \'undefined\') temperature = 1;\n  \n  ' + (this.dataFormatter !== null && typeof this.formatDataIn === 'function' ? 'input = formatDataIn(input);' : '') + '\n        \n  var json = ' + jsonString + ';\n  var _i = 0;\n  var output = [];\n  var states = [];\n  var prevStates;\n  while (true) {\n    var previousIndex = (_i === 0\n        ? 0\n        : _i < input.length\n          ? input[_i - 1] + 1\n          : output[_i - 1])\n          ;\n    var rowPluckIndex = previousIndex;\n    prevStates = states;\n    states = [];\n    ' + statesRaw.join(';\n    ') + ';\n    for (var stateIndex = 0, stateMax = ' + statesRaw.length + '; stateIndex < stateMax; stateIndex++) {\n      var state = states[stateIndex];\n      var product = state.product;\n      var left = state.left;\n      var right = state.right;\n      \n      switch (state.name) {\n' + innerFunctionsSwitch.join('\n') + '\n      }\n    }\n    \n    var logProbabilities = state.product;\n    if (temperature !== 1 && isSampleI) {\n      for (var q = 0, nq = logProbabilities.weights.length; q < nq; q++) {\n        logProbabilities.weights[q] /= temperature;\n      }\n    }\n\n    var probs = softmax(logProbabilities);\n    var nextIndex = isSampleI ? sampleI(probs) : maxI(probs);\n    \n    _i++;\n    if (nextIndex === 0) {\n      break;\n    }\n    if (_i >= maxPredictionLength) {\n      break;\n    }\n\n    output.push(nextIndex);\n  }\n  ' + (this.dataFormatter !== null && typeof this.formatDataOut === 'function' ? 'return formatDataOut(output.slice(input.length).map(function(value) { return value - 1; }))' : 'return output.slice(input.length).map(function(value) { return value - 1; })') + ';\n  \n  function Matrix(rows, columns) {\n    this.rows = rows;\n    this.columns = columns;\n    this.weights = zeros(rows * columns);\n  }\n  ' + (this.dataFormatter !== null && typeof this.formatDataIn === 'function' ? 'function formatDataIn(input, output) { ' + toInner(this.formatDataIn.toString()).replace('this.dataFormatter', 'json.options.dataFormatter') + ' }' : '') + '\n  ' + (this.dataFormatter !== null && typeof this.formatDataOut === 'function' ? 'function formatDataOut(output) { ' + toInner(this.formatDataIn.toString()).replace('this.dataFormatter', 'json.options.dataFormatter') + ' }' : '') + '\n  ' + (this.dataFormatter !== null ? this.dataFormatter.toFunctionString('json.options.dataFormatter') : '') + '\n  ' + _zeros2.default.toString() + '\n  ' + _softmax2.default.toString().replace('_2.default', 'Matrix') + '\n  ' + _random.randomF.toString() + '\n  ' + _sampleI2.default.toString() + '\n  ' + _maxI2.default.toString());
     }
   }]);
 
@@ -714,22 +714,22 @@ RNN.defaults = {
     var values = [];
     var result = [];
     if (typeof data[0] === 'string' || Array.isArray(data[0])) {
-      if (!this.hasOwnProperty('vocab')) {
+      if (this.dataFormatter === null) {
         for (var i = 0; i < data.length; i++) {
           values.push(data[i]);
         }
-        this.vocab = new _vocab2.default(values);
+        this.dataFormatter = new _dataFormatter2.default(values);
       }
       for (var _i = 0, max = data.length; _i < max; _i++) {
         result.push(this.formatDataIn(data[_i]));
       }
     } else {
-      if (!this.hasOwnProperty('vocab')) {
+      if (this.dataFormatter === null) {
         for (var _i2 = 0; _i2 < data.length; _i2++) {
           values.push(data[_i2].input);
           values.push(data[_i2].output);
         }
-        this.vocab = _vocab2.default.fromArrayInputOutput(values);
+        this.dataFormatter = _dataFormatter2.default.fromArrayInputOutput(values);
       }
       for (var _i3 = 0, _max = data.length; _i3 < _max; _i3++) {
         result.push(this.formatDataIn(data[_i3].input, data[_i3].output));
@@ -746,11 +746,11 @@ RNN.defaults = {
   formatDataIn: function formatDataIn(input) {
     var output = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : null;
 
-    if (this.vocab !== null) {
-      if (this.vocab.indexTable.hasOwnProperty('stop-input')) {
-        return this.vocab.toIndexesInputOutput(input, output);
+    if (this.dataFormatter !== null) {
+      if (this.dataFormatter.indexTable.hasOwnProperty('stop-input')) {
+        return this.dataFormatter.toIndexesInputOutput(input, output);
       } else {
-        return this.vocab.toIndexes(input);
+        return this.dataFormatter.toIndexes(input);
       }
     }
     return input;
@@ -762,12 +762,12 @@ RNN.defaults = {
    * @returns {*}
    */
   formatDataOut: function formatDataOut(input, output) {
-    if (this.vocab !== null) {
-      return this.vocab.toCharacters(output).join('');
+    if (this.dataFormatter !== null) {
+      return this.dataFormatter.toCharacters(output).join('');
     }
     return output;
   },
-  vocab: null
+  dataFormatter: null
 };
 
 RNN.trainDefaults = {

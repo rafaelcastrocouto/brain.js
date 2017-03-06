@@ -1,6 +1,6 @@
 import assert from 'assert';
 import RNN from '../../src/recurrent/rnn';
-import Vocab from '../../src/utilities/vocab';
+import DataFormatter from '../../src/utilities/data-formatter';
 import rnnCheck from '../utilities/rnn-check';
 
 function notZero(v) {
@@ -13,12 +13,12 @@ function isZero(v) {
 
 describe('rnn', () => {
   describe('basic operations', () => {
-    it('starts with zeros in input.recurrence', () => {
-      (new RNN()).model.input.recurrence.forEach((v) => {
+    it('starts with zeros in input.deltas', () => {
+      (new RNN()).model.input.deltas.forEach((v) => {
         assert(v === 0);
       });
     });
-    it('after initial run, does not have zeros in recurrence', () => {
+    it('after initial run, does not have zeros in deltas', () => {
       let net = new RNN({
         hiddenSizes: [3],
         inputSize: 3,
@@ -26,20 +26,20 @@ describe('rnn', () => {
         outputSize: 2
       });
       net.runInput([1, 1, 0]);
-      net.model.input.recurrence.forEach((v) => {
+      net.model.input.deltas.forEach((v) => {
         assert.equal(v, 0);
       });
       net.runBackpropagate([1, 1, 0]);
       net.runBackpropagate([0, 1, 1]);
       net.runBackpropagate([1, 0, 1]);
       net.runBackpropagate([1, 1, 0]);
-      assert(net.model.input.recurrence.some(notZero));
+      assert(net.model.input.deltas.some(notZero));
     });
   });
   describe('xor', () => {
     function xorNet() {
       return new RNN({
-        hiddenSizes: [20, 20],
+        hiddenSizes: [9, 9],
         inputSize: 3,
         inputRange: 3,
         outputSize: 3
@@ -58,23 +58,23 @@ describe('rnn', () => {
       let called = [];
       net.model.equations[0] = { run: (v) => {
         called[0] = v;
-        return {rows: 1, columns: 0, weights: [], recurrence: []}; }
+        return {rows: 1, columns: 0, weights: [], deltas: []}; }
       };
       net.model.equations[1] = { run: (v) => {
         called[1] = v;
-        return {rows: 0, columns: 0, weights: [], recurrence: []}; }
+        return {rows: 0, columns: 0, weights: [], deltas: []}; }
       };
       net.model.equations[2] = { run: (v) => {
         called[2] = v;
-        return {rows: 0, columns: 0, weights: [], recurrence: []}; }
+        return {rows: 0, columns: 0, weights: [], deltas: []}; }
       };
       net.model.equations[3] = { run: (v) => {
         called[3] = v;
-        return {rows: 0, columns: 0, weights: [], recurrence: []}; }
+        return {rows: 0, columns: 0, weights: [], deltas: []}; }
       };
       net.model.equations[4] = { run: (v) => {
         called[4] = v;
-        return {rows: 0, columns: 0, weights: [], recurrence: []}; }
+        return {rows: 0, columns: 0, weights: [], deltas: []}; }
       };
       net.runInput([0, 0, 0]);
       assert.equal(called.length, 4);
@@ -95,7 +95,7 @@ describe('rnn', () => {
       let backPropagateCalled = [];
       net.model.equations[0] = {
         run: () => {
-          return {rows: 0, columns: 0, weights: [], recurrence: []};
+          return {rows: 0, columns: 0, weights: [], deltas: []};
         },
         runBackpropagate: (v) => {
           backPropagateCalled[0] = v;
@@ -103,7 +103,7 @@ describe('rnn', () => {
       };
       net.model.equations[1] = {
         run: () => {
-          return {rows: 0, columns: 0, weights: [], recurrence: []};
+          return {rows: 0, columns: 0, weights: [], deltas: []};
         },
         runBackpropagate: (v) => {
           backPropagateCalled[1] = v;
@@ -111,7 +111,7 @@ describe('rnn', () => {
       };
       net.model.equations[2] = {
         run: () => {
-          return {rows: 0, columns: 0, weights: [], recurrence: []};
+          return {rows: 0, columns: 0, weights: [], deltas: []};
         },
         runBackpropagate: (v) => {
           backPropagateCalled[2] = v;
@@ -119,7 +119,7 @@ describe('rnn', () => {
       };
       net.model.equations[3] = {
         run: () => {
-          return {rows: 0, columns: 0, weights: [], recurrence: []};
+          return {rows: 0, columns: 0, weights: [], deltas: []};
         },
         runBackpropagate: (v) => {
           backPropagateCalled[3] = v;
@@ -146,7 +146,7 @@ describe('rnn', () => {
       let backPropagateCalled = [];
       net.model.equations[0] = {
         run: () => {
-          return {rows: 0, columns: 0, weights: [], recurrence: []};
+          return {rows: 0, columns: 0, weights: [], deltas: []};
         },
         runBackpropagate: (v) => {
           backPropagateCalled[0] = v;
@@ -154,7 +154,7 @@ describe('rnn', () => {
       };
       net.model.equations[1] = {
         run: () => {
-          return {rows: 0, columns: 0, weights: [], recurrence: []};
+          return {rows: 0, columns: 0, weights: [], deltas: []};
         },
         runBackpropagate: (v) => {
           backPropagateCalled[1] = v;
@@ -162,7 +162,7 @@ describe('rnn', () => {
       };
       net.model.equations[2] = {
         run: () => {
-          return {rows: 0, columns: 0, weights: [], recurrence: []};
+          return {rows: 0, columns: 0, weights: [], deltas: []};
         },
         runBackpropagate: (v) => {
           backPropagateCalled[2] = v;
@@ -170,7 +170,7 @@ describe('rnn', () => {
       };
       net.model.equations[3] = {
         run: () => {
-          return {rows: 0, columns: 0, weights: [], recurrence: []};
+          return {rows: 0, columns: 0, weights: [], deltas: []};
         },
         runBackpropagate: (v) => {
           backPropagateCalled[3] = v;
@@ -192,53 +192,53 @@ describe('rnn', () => {
       assert.equal(backPropagateCalled[3], 2);
     });
 
-    it('is fully connected and gives values in recurrence', () => {
+    it('is fully connected and gives values in deltas', () => {
       let net = xorNet();
       let input = xorNetValues[2];
       net.model.allMatrices.forEach((m) => {
-        m.recurrence.forEach((value) => {
+        m.deltas.forEach((value) => {
           assert.equal(value, 0);
         });
       });
       net.runInput(input);
 
-      net.model.input.recurrence.forEach((v) => {
+      net.model.input.deltas.forEach((v) => {
         assert.equal(v, 0);
       });
       net.model.hiddenLayers.forEach((layer) => {
         for (let p in layer) {
           if (!layer.hasOwnProperty(p)) continue;
-          layer[p].recurrence.forEach((v) => {
+          layer[p].deltas.forEach((v) => {
             assert.equal(v, 0);
           });
         }
       });
-      net.model.output.recurrence.forEach((v) => {
+      net.model.output.deltas.forEach((v) => {
         assert.equal(v, 0);
       });
 
       net.runBackpropagate(input);
 
-      assert(net.model.input.recurrence.some(notZero));
+      assert(net.model.input.deltas.some(notZero));
       net.model.hiddenLayers.forEach((layer) => {
         for (let p in layer) {
           if (!layer.hasOwnProperty(p)) continue;
-          if (!layer[p].recurrence.some(notZero)) console.log(p);
-          //assert(layer[p].recurrence.some(notZero));
+          if (!layer[p].deltas.some(notZero)) console.log(p);
+          //assert(layer[p].deltas.some(notZero));
         }
       });
-      assert(net.model.output.recurrence.some(notZero));
+      assert(net.model.output.deltas.some(notZero));
 
       net.model.equations.forEach((equation) => {
         equation.states.forEach((state) => {
-          if (state.left && state.left.recurrence) state.left.recurrence.some(notZero);
-          if (state.right && state.right.recurrence) state.right.recurrence.some(notZero);
-          if (state.product && state.product.recurrence) state.product.recurrence.some(notZero);
+          if (state.left && state.left.deltas) state.left.deltas.some(notZero);
+          if (state.right && state.right.deltas) state.right.deltas.some(notZero);
+          if (state.product && state.product.deltas) state.product.deltas.some(notZero);
         });
       });
     });
 
-    it('recurrence and weights do not explode', () => {
+    it('deltas and weights do not explode', () => {
       let net = xorNet();
       let input = xorNetValues[2];
       for (let i = 0; i < 100; i++)
@@ -327,27 +327,27 @@ describe('rnn', () => {
 
     describe('.fromJSON', () => {
       it('can import model from json', () => {
-        let vocab = new Vocab('abcdef'.split(''));
+        let dataFormatter = new DataFormatter('abcdef'.split(''));
         let jsonString = JSON.stringify(new RNN({
           inputSize: 6, //<- length
-          inputRange: vocab.characters.length,
-          outputSize: vocab.characters.length //<- length
+          inputRange: dataFormatter.characters.length,
+          outputSize: dataFormatter.characters.length //<- length
         }).toJSON());
 
         let clone = new RNN({ json: JSON.parse(jsonString) });
 
         assert.equal(jsonString, JSON.stringify(clone.toJSON()));
         assert.equal(clone.inputSize, 6);
-        assert.equal(clone.inputRange, vocab.characters.length);
-        assert.equal(clone.outputSize, vocab.characters.length);
+        assert.equal(clone.inputRange, dataFormatter.characters.length);
+        assert.equal(clone.outputSize, dataFormatter.characters.length);
       });
 
       it('can import model from json and train again', () => {
-        let vocab = new Vocab('abcdef'.split(''));
+        let dataFormatter = new DataFormatter('abcdef'.split(''));
         let jsonString = JSON.stringify(new RNN({
           inputSize: 6, //<- length
-          inputRange: vocab.characters.length,
-          outputSize: vocab.characters.length //<- length
+          inputRange: dataFormatter.characters.length,
+          outputSize: dataFormatter.characters.length //<- length
         }).toJSON());
 
         let clone = new RNN({ json: JSON.parse(jsonString) });
@@ -355,8 +355,8 @@ describe('rnn', () => {
 
         assert.notEqual(jsonString, JSON.stringify(clone.toJSON()));
         assert.equal(clone.inputSize, 6);
-        assert.equal(clone.inputRange, vocab.characters.length);
-        assert.equal(clone.outputSize, vocab.characters.length);
+        assert.equal(clone.inputRange, dataFormatter.characters.length);
+        assert.equal(clone.outputSize, dataFormatter.characters.length);
       });
     });
   });
@@ -364,7 +364,7 @@ describe('rnn', () => {
   describe('rnn.trainPattern', () => {
     it('changes the neural net when ran', () => {
       let net = new RNN({
-        vocab: new Vocab([0, 1]),
+        dataFormatter: new DataFormatter([0, 1]),
         hiddenLayers: [2]
       });
       var netBeforeTraining = JSON.stringify(net.toJSON());
@@ -382,22 +382,22 @@ describe('rnn', () => {
 
   describe('rnn.toFunction', () => {
     it('can output same as run method', () => {
-      const vocab = new Vocab(['h', 'i', ' ', 'm', 'o', '!']);
+      const dataFormatter = new DataFormatter(['h', 'i', ' ', 'm', 'o', '!']);
       let net = new RNN({
         inputSize: 7,
-        inputRange: vocab.characters.length,
+        inputRange: dataFormatter.characters.length,
         outputSize: 7
       });
 
       for (let i = 0; i < 100; i++) {
-        net.trainPattern(vocab.toIndexes('hi mom!'));
+        net.trainPattern(dataFormatter.toIndexes('hi mom!'));
         if (i % 10) {
-          console.log(vocab.toCharacters(net.run()).join(''));
+          console.log(dataFormatter.toCharacters(net.run()).join(''));
         }
       }
 
-      let lastOutput = vocab.toCharacters(net.run()).join('');
-      assert.equal(vocab.toCharacters(net.toFunction()()).join(''), lastOutput);
+      let lastOutput = dataFormatter.toCharacters(net.run()).join('');
+      assert.equal(dataFormatter.toCharacters(net.toFunction()()).join(''), lastOutput);
     });
   });
 });
