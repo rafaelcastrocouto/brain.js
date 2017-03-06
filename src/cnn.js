@@ -15,14 +15,8 @@ export default class CNN extends NeuralNetwork {
     for (let layer = 1; layer <= this.outputLayer; layer++) {
       for (let node = 0; node < this.sizes[layer]; node++) {
         let weights = this.weights[layer][node];
-
-        let sum = this.biases[layer][node];
-        for (let k = 0; k < weights.length; k++) {
-          sum += weights[k] * input[k];
-        }
-
         //TODO: CNN logic here
-        this.outputs[layer][node] = null;
+        this.outputs[layer][node] = convol;
       }
       output = input = this.outputs[layer];
     }
