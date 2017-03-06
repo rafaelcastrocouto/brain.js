@@ -29,38 +29,44 @@ export default class Convolution {
     this.buildRunBackpropagateKernel();
   }
 
-  buildRunKernel() {
-    let fnBody = ['var weights, filterWeights'];
+  get runBody() {
+    let fnBody = [
+      'var convolutionWeights',
+      'var convolutionFilterWeights'
+    ];
     this.iterate({
       eachFilter: (i) => {
-        fnBody.push(`filterWeights = filters[${ i }]`);
+        fnBody.push(`convolutionFilterWeights = convolutionFilters[${ i }]`);
       },
       beforeConvolve: (outputIndex, ax, ay, d) => {
-        fnBody.push('weight = 0');
+        fnBody.push('convolutionWeight = 0');
       },
       eachConvolve: (filterIndex, inputIndex) => {
         this.inputDeltas[inputIndex] = 0;
         fnBody.push(
-          `weight += filterWeights[${ filterIndex }] * inputs[${ inputIndex }]`,
-          `inputDeltas[${ inputIndex }] = 0`
+          `convolutionWeight += convolutionFilterWeights[${ filterIndex }] * convolutionInputs[${ inputIndex }]`,
+          `convolutionInputDeltas[${ inputIndex }] = 0`
         );
       },
       afterConvolve: (outputIndex, ax, ay, d) => {
         this.biases[d] = 0;
         this.outputs[outputIndex] = 0;
         fnBody.push(
-          `weight += biases[${ d }]`,
-          `outputs[${ outputIndex }] = weight`
-          `outputDeltas[${ outputIndex }] = 0`
+          `convolutionWeight += convolutionBiases[${ d }]`,
+          `convolutionOutputs[${ outputIndex }] = convolutionWeight`,
+          `convolutionOutputDeltas[${ outputIndex }] = 0`
         );
       }
     });
+    return fnBody.join(';\n  ') + ';';
+  }
 
+  buildRunKernel() {
     this.runKernel = new Function(
-      'filters',
-      'inputs',
-      'outputs',
-      'biases', fnBody.join(';\n  ') + ';');
+      'convolutionFilters',
+      'convolutionInputs',
+      'convolutionOutputs',
+      'convolutionBiases', this.runBody);
   }
 
   run(inputs) {
@@ -68,34 +74,40 @@ export default class Convolution {
     return this.outputs;
   }
 
-  buildRunBackpropagateKernel() {
-    let fnBody = ['var chainGrad, filterWeights'];
+  get runBackPropagateBody() {
+    let fnBody = [
+      'var convolutionChainGradient',
+      'var convolutionFilterWeights'
+    ];
     this.iterate({
       eachFilter: (d) => {
-        fnBody.push(`filterWeights = filters[${ d }]`);
+        fnBody.push(`convolutionFilterWeights = convolutionFilters[${ d }]`);
       },
       beforeConvolve: (vIndex, ax, ay, d) => {
-        fnBody.push(`chainGrad = chainGrads[${ vIndex }]`);
+        fnBody.push(`convolutionChainGradient = convolutionChainGradients[${ vIndex }]`);
       },
       eachConvolve: (filterIndex, inputIndex) => {
         fnBody.push(
-          `filterDeltas[${ filterIndex }] += inputs[${ inputIndex }] * chainGrad`,
-          `inputDeltas[${ inputIndex }] += filterWeights[${ filterIndex }] * chainGrad`
+          `convolutionFilterDeltas[${ filterIndex }] += convolutionInputs[${ inputIndex }] * convolutionChainGradient`,
+          `convolutionInputDeltas[${ inputIndex }] += convolutionFilterWeights[${ filterIndex }] * convolutionChainGradient`
         );
       },
       afterConvolve: (vIndex, ax, ay, d) => {
         this.biasDeltas[d] = 0;
-        fnBody.push(`biasDeltas[${ d }] += chainGrad`);
+        fnBody.push(`convolutionBiasDeltas[${ d }] += convolutionChainGradient`);
       }
     });
+    return fnBody.join(';\n  ') + ';';
+  }
 
+  buildRunBackpropagateKernel() {
     this.runBackpropagateKernel = new Function(
-      'filters',
-      'filterDeltas',
-      'inputs',
-      'inputDeltas',
-      'biasDeltas',
-      'chainGrads', fnBody.join(';\n  ') + ';');
+      'convolutionFilters',
+      'convolutionFilterDeltas',
+      'convolutionInputs',
+      'convolutionInputDeltas',
+      'convolutionBiasDeltas',
+      'convolutionChainGradients', this.runBackPropagateBody);
   }
 
   runBackpropagate(inputs) {

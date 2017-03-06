@@ -1,3 +1,5 @@
+import zeros from './zeros';
+
 export default class Pool {
   constructor(options) {
     // required
@@ -11,14 +13,14 @@ export default class Pool {
     this.outHeight = Math.floor((this.inHeight + this.padding * 2 - this.height) / this.stride + 1);
 
     // store switches for x,y coordinates for where the max comes from, for each output neuron
-    this.switchX = global.zeros(this.outWidth * this.outHeight * this.depth);
-    this.switchY = global.zeros(this.outWidth * this.outHeight * this.depth);
+    this.switchX = zeros(this.outWidth * this.outHeight * this.depth);
+    this.switchY = zeros(this.outWidth * this.outHeight * this.depth);
     this.runKernel = null;
     this.runBackpropagateKernel = null;
-    this.inputs = inputs;
-    this.inputDeltas = new Array(inputs.length);
-    this.outputs = outputs;
-    this.outputDeltas = new Array(outputs.length);
+    this.inputs = zeros(this.width * this.height);
+    this.inputDeltas = zeros(this.width * this.height);
+    this.outputs = zeros(this.outWidth * this.outHeight);
+    this.outputDeltas = zeros(this.outWidth * this.outHeight);
     this.build();
   }
 
@@ -27,14 +29,14 @@ export default class Pool {
     this.buildRunBackpropagateKernel();
   }
 
-  buildRunKernel() {
-    const fnBody = ['var switchIndex = 0'];
+  get runBody() {
+    const fnBody = ['var poolSwitchIndex = 0'];
     this.iterate({
       beforePool: (outputIndex) => {
         fnBody.push(
-          `var output = -99999`,
-          `var winX = -1`,
-          `var winY = -1`
+          `var poolOutput = -99999`,
+          `var poolWinX = -1`,
+          `var poolWinY = -1`
         );
       },
       eachPool: (inputIndex) => {
@@ -42,34 +44,37 @@ export default class Pool {
         // the max came from. This will speed up backprop
         // and can help make nice visualizations in future
         fnBody.push(
-          `var input = inputs[${ inputIndex }]`,
-          `if (input > output) {`,
-            `output = input`,
-            `winX = innerX`,
-            `winY = innerY`,
+          `var poolInput = poolInputs[${ inputIndex }]`,
+          `if (poolInput > poolOutput) {`,
+          `  poolOutput = poolInput`,
+          `  poolWinX = poolInnerX`,
+          `  poolWinY = poolInnerY`,
           `}`
         );
       },
       afterPool: (outputIndex) => {
         fnBody.push(
-          `switchX[switchIndex] = winX`,
-          `switchY[switchIndex] = winY`,
-          `outputs[${ outputIndex }] = output`,
-          `outputDeltas[${ outputIndex }] = 0`,
-          `switchIndex++`
+          `poolSwitchX[poolSwitchIndex] = poolWinX`,
+          `poolSwitchY[poolSwitchIndex] = poolWinY`,
+          `poolOutputs[${ outputIndex }] = poolOutput`,
+          `poolOutputDeltas[${ outputIndex }] = 0`,
+          `poolSwitchIndex++`
         );
       }
     });
+    return fnBody.join(';\n  ') + ';'
+  }
 
-    this.runKernel = new Function(this.runInputs(), fnBody.join(';\n  ') + ';');
+  buildRunKernel() {
+    this.runKernel = new Function(this.runInputs(), this.runBody);
   }
 
   runInputs() {
     return [
-      'inputs',
-      'outputs',
-      'switchX',
-      'switchY'
+      'poolInputs',
+      'poolOutputs',
+      'poolSwitchX',
+      'poolSwitchY'
     ];
   }
 
@@ -78,30 +83,33 @@ export default class Pool {
     return this.outputs;
   }
 
-  buildRunBackpropagateKernel() {
-    const fnBody = ['var switchIndex = 0'];
+  get runBackpropagateBody() {
+    const fnBody = ['var poolSwitchIndex = 0'];
     this.iterate({
       beforePool: (outputIndex) => {
-        fnBody.push(`var outputDeltaXY = ((${ this.width } * switchY[switchIndex]) + switchX[switchIndex]) * ${ this.depth }`);
+        fnBody.push(`var poolOutputDeltaXY = ((${ this.width } * poolSwitchY[poolSwitchIndex]) + poolSwitchX[poolSwitchIndex]) * ${ this.depth }`);
       },
       eachPool: (outputIndex, d) => {
         fnBody.push(
-          `outputDeltas[outputDeltaXY + ${ d }] = outputs[${ outputIndex }]`,
-          `switchIndex++`
+          `poolOutputDeltas[poolOutputDeltaXY + ${ d }] = poolOutputs[${ outputIndex }]`,
+          `poolSwitchIndex++`
         );
       },
       afterPool: (outputIndex) => {}
     });
+    return fnBody.join(';\n  ') + ';';
+  }
 
-    this.runKernel = new Function(this.runBackpropagateInputs(), fnBody.join(';\n  ') + ';');
+  buildRunBackpropagateKernel() {
+    this.runKernel = new Function(this.runBackpropagateInputs(), this.runBackpropagateBody);
   }
 
   runBackpropagateInputs() {
     return [
-      'inputs',
-      'outputs',
-      'switchX',
-      'switchY'
+      'poolInputs',
+      'poolOutputs',
+      'poolSwitchX',
+      'poolSwitchY'
     ];
   }
 

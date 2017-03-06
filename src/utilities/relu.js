@@ -1,9 +1,11 @@
+import zeros from './zeros';
+
 export default class Relu {
   constructor(inputs, outputs) {
     this.runKernel = null;
     this.runBackpropagateKernel = null;
-    this.inputs = inputs;
-    this.outputs = outputs;
+    this.inputs = zeros(this.width * this.height);
+    this.outputs = zeros(this.width * this.height);
     this.inputDeltas = new Array(inputs.length);
     this.outputDeltas = new Array(outputs.length);
     this.build();
@@ -14,21 +16,16 @@ export default class Relu {
     this.buildRunBackpropagateKernel();
   }
 
-  static runInputs = [
-    'inputs',
-    'inputDeltas',
-    'outputs',
-    'outputDeltas'
-  ];
-
   get runBody() {
-    const fnBody = [];
+    const fnBody = [
+
+    ];
     this.iterate({
       each: (i) => {
         fnBody.push(
-          `outputs[${ i }] = inputs[${ i }] < 0 ? 0 : inputs[${ i }]`,
-          `inputDeltas[${ i }] = 0`,
-          `outputDeltas[${ i }] = 0`
+          `reluOutputs[${ i }] = reluInputs[${ i }] < 0 ? 0 : reluInputs[${ i }]`,
+          `reluInputDeltas[${ i }] = 0`,
+          `reluOutputDeltas[${ i }] = 0`
         );
       }
     });
@@ -36,26 +33,18 @@ export default class Relu {
   }
 
   buildRunKernel() {
-    this.runKernel = new Function(
-      this.runInputs, this.runBody);
+    this.runKernel = new Function(this.runInputs, this.runBody);
   }
 
   run() {
     this.runKernel(this.input, this.inputDeltas, this.output, this.outputDeltas);
   }
 
-  static runBackpropagateInputs = [
-    'inputs',
-    'inputDeltas',
-    'outputs',
-    'outputDeltas'
-  ];
-
   get runBackpropagateBody() {
     const fnBody = [];
     this.iterate({
       each: (i) => {
-        fnBody.push(`inputDeltas[${ i }] = output[${ i }] <= 0 ? 0 : outputDeltas[${ i }]`);
+        fnBody.push(`reluInputDeltas[${ i }] = reluOutput[${ i }] <= 0 ? 0 : reluOutputDeltas[${ i }]`);
       }
     });
     return fnBody.join(';\n  ') + ';';
@@ -76,3 +65,17 @@ export default class Relu {
     }
   }
 }
+
+Relu.runInputs = [
+  'reluInputs',
+  'reluInputDeltas',
+  'reluOutputs',
+  'reluOutputDeltas'
+];
+
+Relu.runBackpropagateInputs = [
+  'reluInputs',
+  'reluInputDeltas',
+  'reluOutputs',
+  'reluOutputDeltas'
+];
