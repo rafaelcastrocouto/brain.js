@@ -6,28 +6,17 @@ Object.defineProperty(exports, "__esModule", {
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
 
+var _templateObject = _taggedTemplateLiteral(['outputDeltas[', '] = 0'], ['outputDeltas[', '] = 0']);
+
 function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
 
 function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
 
+function _taggedTemplateLiteral(strings, raw) { return Object.freeze(Object.defineProperties(strings, { raw: { value: Object.freeze(raw) } })); }
+
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
 var Convolution = function () {
-  _createClass(Convolution, null, [{
-    key: 'defaults',
-    get: function get() {
-      return {
-        width: 9,
-        height: null,
-        inWidth: 9,
-        inHeight: 9,
-        depth: 3,
-        stride: 3,
-        padding: 0
-      };
-    }
-  }]);
-
   function Convolution(settings) {
     _classCallCheck(this, Convolution);
 
@@ -64,28 +53,7 @@ var Convolution = function () {
   }, {
     key: 'buildRunKernel',
     value: function buildRunKernel() {
-      var _this = this;
-
-      var fnBody = ['var weights, filterWeights'];
-      this.iterateStructure({
-        eachFilter: function eachFilter(i) {
-          fnBody.push('filterWeights = filters[' + i + ']');
-        },
-        beforeConvolve: function beforeConvolve(vIndex, ax, ay, d) {
-          fnBody.push('weight = 0');
-        },
-        eachConvolve: function eachConvolve(filterIndex, inputIndex) {
-          _this.inputDeltas[inputIndex] = 0;
-          fnBody.push('weight += filterWeights[' + filterIndex + '] * inputs[' + inputIndex + ']', 'inputDeltas[' + inputIndex + '] = 0');
-        },
-        afterConvolve: function afterConvolve(vIndex, ax, ay, d) {
-          _this.biases[d] = 0;
-          _this.outputs[vIndex] = 0;
-          fnBody.push('weight += biases[' + d + ']', 'outputs[' + vIndex + '] = weight');
-        }
-      });
-
-      this.runKernel = new Function('filters', 'inputs', 'outputs', 'biases', fnBody.join(';\n  ') + ';');
+      this.runKernel = new Function('convolutionFilters', 'convolutionInputs', 'convolutionOutputs', 'convolutionBiases', this.runBody);
     }
   }, {
     key: 'run',
@@ -96,26 +64,7 @@ var Convolution = function () {
   }, {
     key: 'buildRunBackpropagateKernel',
     value: function buildRunBackpropagateKernel() {
-      var _this2 = this;
-
-      var fnBody = ['var chainGrad, filterWeights'];
-      this.iterateStructure({
-        eachFilter: function eachFilter(d) {
-          fnBody.push('filterWeights = filters[' + d + ']');
-        },
-        beforeConvolve: function beforeConvolve(vIndex, ax, ay, d) {
-          fnBody.push('chainGrad = chainGrads[' + vIndex + ']');
-        },
-        eachConvolve: function eachConvolve(filterIndex, inputIndex) {
-          fnBody.push('filterDeltas[' + filterIndex + '] += inputs[' + inputIndex + '] * chainGrad', 'inputDeltas[' + inputIndex + '] += filterWeights[' + filterIndex + '] * chainGrad');
-        },
-        afterConvolve: function afterConvolve(vIndex, ax, ay, d) {
-          _this2.biasDeltas[d] = 0;
-          fnBody.push('biasDeltas[' + d + '] += chainGrad');
-        }
-      });
-
-      this.runBackpropagateKernel = new Function('filters', 'filterDeltas', 'inputs', 'inputDeltas', 'biasDeltas', 'chainGrads', fnBody.join(';\n  ') + ';');
+      this.runBackpropagateKernel = new Function('convolutionFilters', 'convolutionFilterDeltas', 'convolutionInputs', 'convolutionInputDeltas', 'convolutionBiasDeltas', 'convolutionChainGradients', this.runBackPropagateBody);
     }
   }, {
     key: 'runBackpropagate',
@@ -123,8 +72,8 @@ var Convolution = function () {
       this.runBackpropagateKernel(this.filters, this.filterDeltas, inputs, this.inputDeltas, this.biasDeltas);
     }
   }, {
-    key: 'iterateStructure',
-    value: function iterateStructure(options) {
+    key: 'iterate',
+    value: function iterate(options) {
       var width = this.width,
           height = this.height,
           outWidth = this.outWidth,
@@ -146,24 +95,72 @@ var Convolution = function () {
           var x = -padding;
           for (var outerX = 0; outerX < outWidth; x += stride, outerX++) {
             // convolve centered at this particular location
-            var vIndex = width * outerY + x * depth + d;
-            beforeConvolve(vIndex, outerY, outerX, d);
+            var outputIndex = width * outerY + x * depth + d;
+            beforeConvolve(outputIndex, outerY, outerX, d);
             for (var filterY = 0; filterY < filter.height; filterY++) {
               // coordinates in the original input array coordinates
               var innerY = y + filterY;
               for (var filterX = 0; filterX < filter.width; filterX++) {
                 var innerX = x + filterX;
-                if (innerY >= 0 && innerY < filter.height && innerX >= 0 && innerX < width) {
-                  for (var filterDepth = 0; filterDepth < filter.depth; filterDepth++) {
-                    eachConvolve((filter.width * filterY + filterX) * filter.depth + filterDepth, (width * innerY + innerX) * filter.depth + filterDepth);
-                  }
+                if (innerY < 0 && innerY >= filter.height && innerX < 0 && innerX >= width) continue;
+
+                for (var filterDepth = 0; filterDepth < filter.depth; filterDepth++) {
+                  eachConvolve((filter.width * filterY + filterX) * filter.depth + filterDepth, (width * innerY + innerX) * filter.depth + filterDepth);
                 }
               }
             }
-            afterConvolve(vIndex, outerX, outerY, d);
+            afterConvolve(outputIndex, outerX, outerY, d);
           }
         }
       }
+    }
+  }, {
+    key: 'runBody',
+    get: function get() {
+      var _this = this;
+
+      var fnBody = ['var weights', 'var filterWeights'];
+      this.iterate({
+        eachFilter: function eachFilter(i) {
+          fnBody.push('filterWeights = filters[' + i + ']');
+        },
+        beforeConvolve: function beforeConvolve(outputIndex, ax, ay, d) {
+          fnBody.push('weight = 0');
+        },
+        eachConvolve: function eachConvolve(filterIndex, inputIndex) {
+          _this.inputDeltas[inputIndex] = 0;
+          fnBody.push('weight += filterWeights[' + filterIndex + '] * inputs[' + inputIndex + ']', 'inputDeltas[' + inputIndex + '] = 0');
+        },
+        afterConvolve: function afterConvolve(outputIndex, ax, ay, d) {
+          _this.biases[d] = 0;
+          _this.outputs[outputIndex] = 0;
+          fnBody.push('weight += biases[' + d + ']', ('outputs[' + outputIndex + '] = weight')(_templateObject, outputIndex));
+        }
+      });
+      return fnBody.join(';\n  ') + ';';
+    }
+  }, {
+    key: 'runBackPropagateBody',
+    get: function get() {
+      var _this2 = this;
+
+      var fnBody = ['var convolutionChainGradient', 'var convolutionFilterWeights'];
+      this.iterate({
+        eachFilter: function eachFilter(d) {
+          fnBody.push('convolutionFilterWeights = convolutionFilters[' + d + ']');
+        },
+        beforeConvolve: function beforeConvolve(vIndex, ax, ay, d) {
+          fnBody.push('convolutionChainGradient = convolutionChainGradients[' + vIndex + ']');
+        },
+        eachConvolve: function eachConvolve(filterIndex, inputIndex) {
+          fnBody.push('convolutionFilterDeltas[' + filterIndex + '] += convolutionInputs[' + inputIndex + '] * convolutionChainGradient', 'convolutionInputDeltas[' + inputIndex + '] += convolutionFilterWeights[' + filterIndex + '] * convolutionChainGradient');
+        },
+        afterConvolve: function afterConvolve(vIndex, ax, ay, d) {
+          _this2.biasDeltas[d] = 0;
+          fnBody.push('convolutionBiasDeltas[' + d + '] += convolutionChainGradient');
+        }
+      });
+      return fnBody.join(';\n  ') + ';';
     }
   }]);
 
@@ -171,6 +168,17 @@ var Convolution = function () {
 }();
 
 exports.default = Convolution;
+
+
+Convolution.defaults = {
+  width: 9,
+  height: null,
+  inWidth: 9,
+  inHeight: 9,
+  depth: 3,
+  stride: 3,
+  padding: 0
+};
 
 var Float32Array3D = function (_Float32Array) {
   _inherits(Float32Array3D, _Float32Array);
@@ -188,8 +196,4 @@ var Float32Array3D = function (_Float32Array) {
 
   return Float32Array3D;
 }(Float32Array);
-
-var c = new Convolution();
-c.build();
-console.log(c.runKernel.toString());
 //# sourceMappingURL=convolution.js.map

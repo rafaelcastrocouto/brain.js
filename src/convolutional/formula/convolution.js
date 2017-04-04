@@ -1,24 +1,23 @@
+import Filter from './filter';
+import Bias from './bias';
+
 export default class Convolution {
-  constructor(settings) {
-    Object.assign(this, Convolution.defaults, settings);
+  constructor(input, options) {
+    this.input = input;
+    Object.assign(this, Convolution.defaults, options);
     this.runKernel = null;
     this.runBackpropagateKernel = null;
     this.filters = [];
-    this.filterDeltas = [];
-    this.biasDeltas = [];
     this.biases = [];
-    this.inputDeltas = [];
     this.outputs = [];
 
-    if (this.height === null) {
-      this.height = this.width;
-    }
-    this.outWidth = Math.floor((this.width + this.padding * 2 - this.width) / this.stride + 1);
-    this.outHeight = Math.floor((this.height + this.padding * 2 - this.height) / this.stride + 1);
+    const { padding, stride, width, height, depth } = this;
+    this.width = Math.floor((input.width + padding * 2 - width) / stride + 1);
+    this.height = Math.floor((input.height + padding * 2 - height) / stride + 1);
 
-    for(let i = 0; i < this.depth; i++) {
-      this.filters.push(new Float32Array3D(this.width, this.height, this.depth));
-      this.filterDeltas.push(new Float32Array3D(this.width, this.height, this.depth));
+    for(let i = 0; i < depth; i++) {
+      this.filters.push(new Filter(width, height, depth));
+      this.biases.push(new Bias());
     }
 
     this.build();
@@ -42,14 +41,13 @@ export default class Convolution {
         fnBody.push('convolutionWeight = 0');
       },
       eachConvolve: (filterIndex, inputIndex) => {
-        this.inputDeltas[inputIndex] = 0;
         fnBody.push(
           `convolutionWeight += convolutionFilterWeights[${ filterIndex }] * convolutionInputs[${ inputIndex }]`,
           `convolutionInputDeltas[${ inputIndex }] = 0`
         );
       },
       afterConvolve: (outputIndex, ax, ay, d) => {
-        this.biases[d] = 0;
+        this.biases.weights[d] = 0;
         this.outputs[outputIndex] = 0;
         fnBody.push(
           `convolutionWeight += convolutionBiases[${ d }]`,
@@ -111,18 +109,22 @@ export default class Convolution {
   }
 
   runBackpropagate(inputs) {
-    this.runBackpropagateKernel(this.filters, this.filterDeltas, inputs, this.inputDeltas, this.biasDeltas);
+    this.runBackpropagateKernel(this.filters, inputs, this.inputDeltas, this.biasDeltas);
   }
 
   iterate(options) {
     const {
+      input,
       width,
       height,
-      outWidth,
-      outHeight,
       depth,
       stride,
       padding } = this;
+
+    const {
+      width: inputWidth,
+      height: inputHeight
+    } = input;
 
     const {
       eachFilter,
@@ -130,58 +132,49 @@ export default class Convolution {
       eachConvolve,
       afterConvolve } = options;
 
-    for (let d = 0; d < depth; d++) {
-      eachFilter(d);
-      const filter = this.filters[d];
+    this.filters.forEach((filter, filterIndex) => {
+      eachFilter(filterIndex);
       let y = -padding;
-      for (let outerY = 0; outerY < outHeight; y += stride, outerY++) {
+      console.log(height,);
+      for (let outerY = 0; outerY < height; y += stride, outerY++) {
         let x = -padding;
-        for (let outerX = 0; outerX < outWidth; x += stride, outerX++) {
+        for (let outerX = 0; outerX < width; x += stride, outerX++) {
           // convolve centered at this particular location
-          const outputIndex = (width * outerY) + x * depth + d;
-          beforeConvolve(outputIndex, outerY, outerX, d);
-          for (let filterY = 0; filterY < filter.height; filterY++) {
-            // coordinates in the original input array coordinates
-            let innerY = y + filterY;
-            for (let filterX = 0; filterX < filter.width; filterX++) {
-              let innerX = x + filterX;
-              if (
-                innerY < 0
-                && innerY >= filter.height
-                && innerX < 0
-                && innerX >= width
-              ) continue;
+          const outputIndex = (inputWidth * outerY) + x * depth + filterIndex;
+          console.log(filter);
+          beforeConvolve(outputIndex, outerY, outerX, filterIndex);
 
-              for (let filterDepth = 0; filterDepth < filter.depth; filterDepth++) {
-                eachConvolve(
-                  ((filter.width * filterY) + filterX) * filter.depth + filterDepth,
-                  ((width * innerY) + innerX) * filter.depth + filterDepth
-                );
-              }
-            }
-          }
-          afterConvolve(outputIndex, outerX, outerY, d);
+          filter.iterate((filterX, filterY, filterDepth) => {
+            console.log(filterX, filterY, filterDepth);
+            let innerY = y + filterY;
+            let innerX = x + filterX;
+            if (
+              innerY < 0
+              && innerY >= filter.height
+              && innerX < 0
+              && innerX >= inputWidth
+            ) return;
+
+            eachConvolve(
+              ((filter.width * filterY) + filterX) * filter.depth + filterDepth,
+              ((inputWidth * innerY) + innerX) * filter.depth + filterDepth
+            );
+          });
+          afterConvolve(outputIndex, outerX, outerY, filterIndex);
         }
       }
-    }
+    });
   }
 }
 
 Convolution.defaults = {
-  width: 9,
-  height: null,
-  inWidth: 9,
-  inHeight: 9,
   depth: 3,
   stride: 3,
-  padding: 0
+  padding: 1,
+  width: 9,
+  height: 9
 };
 
-class Float32Array3D extends Float32Array {
-  constructor(width, height, depth) {
-    super(width * height * depth);
-    this.width = width;
-    this.height = height;
-    this.depth = depth;
-  }
-}
+var conv = new Convolution({ height: 27, width: 27 });
+conv.build();
+console.log(conv.runKernel.toString());

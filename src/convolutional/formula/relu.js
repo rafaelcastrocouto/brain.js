@@ -1,11 +1,15 @@
-import zeros from './zeros';
+import zeros from '../../utilities/zeros';
 
 export default class Relu {
-  constructor(inputs, outputs) {
+  constructor(input) {
     this.runKernel = null;
     this.runBackpropagateKernel = null;
-    this.inputs = zeros(this.width * this.height);
-    this.outputs = zeros(this.width * this.height);
+    this.input = input;
+    this.width = input.width;
+    this.height = input.height;
+    this.depth = input.depth;
+    const inputs = this.inputs = zeros(this.width * this.height);
+    const outputs = this.outputs = zeros(this.width * this.height);
     this.inputDeltas = new Array(inputs.length);
     this.outputDeltas = new Array(outputs.length);
     this.build();
@@ -17,9 +21,7 @@ export default class Relu {
   }
 
   get runBody() {
-    const fnBody = [
-
-    ];
+    const fnBody = [];
     this.iterate({
       each: (i) => {
         fnBody.push(

@@ -14,6 +14,14 @@ var _convolution = require('./utilities/convolution');
 
 var _convolution2 = _interopRequireDefault(_convolution);
 
+var _pool = require('./utilities/pool');
+
+var _pool2 = _interopRequireDefault(_pool);
+
+var _relu = require('./utilities/relu');
+
+var _relu2 = _interopRequireDefault(_relu);
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
@@ -47,16 +55,35 @@ var CNN = function (_NeuralNetwork) {
       for (var layer = 1; layer <= this.outputLayer; layer++) {
         for (var node = 0; node < this.sizes[layer]; node++) {
           var weights = this.weights[layer][node];
-
-          var sum = this.biases[layer][node];
-          for (var k = 0; k < weights.length; k++) {
-            sum += weights[k] * input[k];
-          }
-
           //TODO: CNN logic here
-          this.outputs[layer][node] = null;
+          this.outputs[layer][node] = convol;
         }
         output = input = this.outputs[layer];
+      }
+      return output;
+    }
+  }, {
+    key: 'buildBackPropagateKernel',
+    value: function buildBackPropagateKernel() {}
+  }, {
+    key: 'runBody',
+    get: function get() {
+      var fnBody = ['this.outputs[0] = input', 'var output = null', 'var inputs = []'];
+
+      for (var layerIndex = 1; layerIndex <= this.outputLayer; layerIndex++) {
+        for (var nodeIndex = 0; nodeIndex < this.sizes[layerIndex]; nodeIndex++) {
+          var convolution = new _convolution2.default();
+          fnBody.push(convolution.runBody);
+
+          var pool = new _pool2.default();
+          fnBody.push(pool.runBody);
+
+          var relu = new _relu2.default();
+          fnBody.push(relu.runBody);
+
+          fnBody.push('this.outputs[' + layerIndex + '][' + nodeIndex + '] = output');
+        }
+        fnBody.push('output = input = this.outputs[' + layerIndex + ']');
       }
       return output;
     }
@@ -66,4 +93,7 @@ var CNN = function (_NeuralNetwork) {
 }(_neuralNetwork2.default);
 
 exports.default = CNN;
+
+
+console.log(new CNN().runBody);
 //# sourceMappingURL=cnn.js.map

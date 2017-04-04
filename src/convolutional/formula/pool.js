@@ -1,26 +1,24 @@
-import zeros from './zeros';
+import zeros from '../../utilities/zeros';
 
 export default class Pool {
-  constructor(options) {
-    // required
+  constructor(input, options) {
+    this.input = input;
+    const inputWidth = input.width;
+    const inputHeight = input.height;
+
     Object.assign(this, Pool.defaults, options);
-    if (this.height === null) {
-      this.height = this.width;
-    }
 
     // computed
-    this.outWidth = Math.floor((this.inWidth + this.padding * 2 - this.width) / this.stride + 1);
-    this.outHeight = Math.floor((this.inHeight + this.padding * 2 - this.height) / this.stride + 1);
+    this.width = Math.floor((inputWidth + this.padding * 2 - this.width) / this.stride + 1);
+    this.height = Math.floor((inputHeight + this.padding * 2 - this.height) / this.stride + 1);
 
     // store switches for x,y coordinates for where the max comes from, for each output neuron
-    this.switchX = zeros(this.outWidth * this.outHeight * this.depth);
-    this.switchY = zeros(this.outWidth * this.outHeight * this.depth);
+    this.switchX = zeros(this.width * this.height * this.depth);
+    this.switchY = zeros(this.width * this.height * this.depth);
     this.runKernel = null;
     this.runBackpropagateKernel = null;
-    this.inputs = zeros(this.width * this.height);
-    this.inputDeltas = zeros(this.width * this.height);
-    this.outputs = zeros(this.outWidth * this.outHeight);
-    this.outputDeltas = zeros(this.outWidth * this.outHeight);
+    this.outputs = zeros(this.width * this.height);
+    this.outputDeltas = zeros(this.width * this.height);
     this.build();
   }
 
@@ -122,10 +120,13 @@ export default class Pool {
       padding,
       depth,
       width,
-      outWidth,
       height,
-      outHeight,
       stride } = this;
+
+    const {
+      width: inputWidth,
+      height: inputHeight
+    } = this.input;
 
     const {
       beforePool,
@@ -134,9 +135,9 @@ export default class Pool {
 
     for(let d = 0; d < depth; d++) {
       let x = -padding;
-      for(let outerX =0; outerX < outWidth; x += stride, outerX++) {
+      for(let outerX =0; outerX < inputWidth; x += stride, outerX++) {
         let y = -padding;
-        for(let outerY = 0; outerY < outHeight; y += stride, outerY++) {
+        for(let outerY = 0; outerY < inputHeight; y += stride, outerY++) {
           // pool centered at this particular location
           beforePool(outerX * outerY * d);
           for(let filterX = 0; filterX < width; filterX++) {
@@ -162,8 +163,6 @@ export default class Pool {
 Pool.defaults = {
   width: 9,
   height: null,
-  inWidth: 9,
-  inHeight: 9,
   depth: 3,
   stride: 2,
   padding: 0
