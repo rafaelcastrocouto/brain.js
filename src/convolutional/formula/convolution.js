@@ -29,33 +29,34 @@ export default class Convolution {
   }
 
   get runBody() {
-    let fnBody = [
-      'var convolutionWeights',
+    let convolutionWeight;
+    const fnBody = [
+      'var convolutionWeight',
       'var convolutionFilterWeights'
     ];
+
     this.iterate({
       eachFilter: (i) => {
         fnBody.push(`convolutionFilterWeights = convolutionFilters[${ i }]`);
       },
       beforeConvolve: (outputIndex, ax, ay, d) => {
-        fnBody.push('convolutionWeight = 0');
+        convolutionWeight = [];
       },
       eachConvolve: (filterIndex, inputIndex) => {
+        convolutionWeight.push(`(convolutionFilterWeights[${ filterIndex }] * convolutionInputs[${ inputIndex }])`);
         fnBody.push(
-          `convolutionWeight += convolutionFilterWeights[${ filterIndex }] * convolutionInputs[${ inputIndex }]`,
           `convolutionInputDeltas[${ inputIndex }] = 0`
         );
       },
       afterConvolve: (outputIndex, ax, ay, d) => {
-        this.biases.weights[d] = 0;
-        this.outputs[outputIndex] = 0;
         fnBody.push(
-          `convolutionWeight += convolutionBiases[${ d }]`,
+          `convolutionWeight = ${ convolutionWeight.join(' + ') } + convolutionBiases[${ d }]`,
           `convolutionOutputs[${ outputIndex }] = convolutionWeight`,
           `convolutionOutputDeltas[${ outputIndex }] = 0`
         );
       }
     });
+
     return fnBody.join(';\n  ') + ';';
   }
 
@@ -91,7 +92,6 @@ export default class Convolution {
         );
       },
       afterConvolve: (vIndex, ax, ay, d) => {
-        this.biasDeltas[d] = 0;
         fnBody.push(`convolutionBiasDeltas[${ d }] += convolutionChainGradient`);
       }
     });
@@ -135,17 +135,14 @@ export default class Convolution {
     this.filters.forEach((filter, filterIndex) => {
       eachFilter(filterIndex);
       let y = -padding;
-      console.log(height,);
       for (let outerY = 0; outerY < height; y += stride, outerY++) {
         let x = -padding;
         for (let outerX = 0; outerX < width; x += stride, outerX++) {
           // convolve centered at this particular location
           const outputIndex = (inputWidth * outerY) + x * depth + filterIndex;
-          console.log(filter);
           beforeConvolve(outputIndex, outerY, outerX, filterIndex);
 
           filter.iterate((filterX, filterY, filterDepth) => {
-            console.log(filterX, filterY, filterDepth);
             let innerY = y + filterY;
             let innerX = x + filterX;
             if (
@@ -177,4 +174,5 @@ Convolution.defaults = {
 
 var conv = new Convolution({ height: 27, width: 27 });
 conv.build();
-console.log(conv.runKernel.toString());
+const fs = require('fs');
+fs.writeFileSync('conv-kern.js', conv.runKernel.toString());
