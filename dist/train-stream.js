@@ -16,6 +16,8 @@ var _lookup2 = _interopRequireDefault(_lookup);
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
+function _toConsumableArray(arr) { if (Array.isArray(arr)) { for (var i = 0, arr2 = Array(arr.length); i < arr.length; i++) { arr2[i] = arr[i]; } return arr2; } else { return Array.from(arr); } }
+
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
 function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
@@ -211,7 +213,7 @@ var TrainStream = function (_Writable) {
 
 /**
  *
- * http://stackoverflow.com/a/21445415/1324039
+ * https://gist.github.com/telekosmos/3b62a31a5c43f40849bb
  * @param arr
  * @returns {Array}
  */
@@ -219,12 +221,7 @@ var TrainStream = function (_Writable) {
 
 exports.default = TrainStream;
 function uniques(arr) {
-  var a = [];
-  for (var i = 0, l = arr.length; i < l; i++) {
-    if (a.indexOf(arr[i]) === -1 && arr[i] !== '') {
-      a.push(arr[i]);
-    }
-  }
-  return a;
+  // Sets cannot contain duplicate elements, which is what we want
+  return [].concat(_toConsumableArray(new Set(arr)));
 }
 //# sourceMappingURL=train-stream.js.map
