@@ -1,4 +1,4 @@
-importScripts("brain-0.6.3.js");
+importScripts('https://cdn.rawgit.com/BrainJS/brain.js/c0c114ab/browser.js');
 
 onmessage = function(event) {
   var data = JSON.parse(event.data);
@@ -10,10 +10,13 @@ onmessage = function(event) {
     callbackPeriod: 500
   });
 
-  postMessage(JSON.stringify({type: 'result', net: net.toJSON()}));
-}
+  postMessage(JSON.stringify({
+    type: 'result',
+    net: net.toJSON()
+  }));
+};
 
 function postProgress(progress) {
-  progress.type = 'progress'
+  progress.type = 'progress';
   postMessage(JSON.stringify(progress));
 }

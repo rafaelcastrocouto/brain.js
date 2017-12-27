@@ -2,16 +2,12 @@
 <html>
 <head>
   <link rel="stylesheet" href="blackorwhite.css">
-
-  <script src="jquery-1.4.2.min.js"></script>
-  <script src="brain-0.6.3.js"></script>
-  <script src="blackorwhite.js"></script>
-
+  <script src="https://cdn.rawgit.com/BrainJS/brain.js/c0c114ab/browser.js"></script>
   <title>brain.js demo: Train a neural network to recognize color contrast</title>
 </head>
 
 <body>
-    <a href="http://github.com/harthur-org/brain.js"><img style="position: absolute; top: 0; right: 0; border: 0;" src="http://s3.amazonaws.com/github/ribbons/forkme_right_gray_6d6d6d.png" alt="Fork me on GitHub" /></a>
+    <a href="http://github.com/BrainJS/brain.js"><img style="position: absolute; top: 0; right: 0; border: 0;" src="http://s3.amazonaws.com/github/ribbons/forkme_right_gray_6d6d6d.png" alt="Fork me on GitHub" /></a>
 
   <div id="desc">brain.js demo - train a neural network to recognize color contrast</div>
 
@@ -20,7 +16,7 @@
       <div class="section-header">
         Which one can you read more easily?
       </div>
-        <div id="swatches">
+        <div class="swatches">
 		    <div class="swatch-box">
             <div id="black-swatch" class="swatch" onclick="trainer.pickSwatch('black');">
               <div class="swatch-text">This one</div>
@@ -30,7 +26,7 @@
               <div class="swatch-text">This one</div>
             </div></div>
         </div>
-        <div id="training-buttons">
+        <div class="training-buttons">
           <span class="pass-button button" onclick="trainer.changeColor();"
                 title="skip">&rarr;</span>
         </div>
@@ -53,7 +49,7 @@
    </div>
 
     <div class="section" id="testing-box">
-      <div id="swatches">
+      <div class="swatches">
 	      <div id="nn-swatch-box" class="swatch-box">
             <div id="nn-swatch" class="swatch" onclick="tester.viewCode('nn');"
                  title="view neural network code">
@@ -82,7 +78,7 @@
 	        </div>
         </div>
       </div>
-      <div id="training-buttons">
+      <div class="training-buttons">
         <span class="pass-button button" onclick="tester.testRandom();"
               title="next color">&rarr;</span>
       </div>
@@ -92,4 +88,8 @@
     </div>
   </div>
 </body>
+<script src="blackorwhite.js"></script>
+<script>
+  trainer.changeColor();
+</script>
 </html>
