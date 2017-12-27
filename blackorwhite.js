@@ -72,7 +72,7 @@ const trainer = {
     else {
       const net = new brain.NeuralNetworkGPU();
       net.train(this.data, {
-        iterations: 100
+        iterations: 9000
       });
       tester.show(net);
     }
