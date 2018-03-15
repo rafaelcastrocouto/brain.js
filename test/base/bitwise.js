@@ -9,62 +9,114 @@ function isAround(actual, expected) {
   return true;
 }
 
-function testBitwise(data, op) {
+function testBitwise(data, activation, op) {
   let net = new brain.NeuralNetwork();
-  let res = net.train(data, { errorThresh: 0.003 });
+  let res = net.train(data, {
+    errorThresh: 0.003,
+    activation
+  });
+
+  console.log(res);
 
   data.forEach(d => {
-    var actual = net.run(d.input)
-    var expected = d.output;
+    const actual = net.run(d.input);
+    const expected = d.output;
     assert.ok(isAround(actual, expected), `failed to train "${op}" - expected: ${expected}, actual: ${actual}`);
   });
 }
 
-function testBitwiseAsync(data, op, done) {
-  let net = new brain.NeuralNetwork();
-  net
-    .trainAsync(data, { errorThresh: 0.003 })
-    .then(res => {
-      data.forEach(d => {
-        var actual = net.run(d.input)
-        var expected = d.output;
-        assert.ok(isAround(actual, expected), `failed to train "${op}" - expected: ${expected}, actual: ${actual}`);
-      });
-      done();
-    })
-    .catch(err => {
-      assert.ok(false, err.toString())
-    });
-}
-
 describe('bitwise functions sync training', () => {
-  it('NOT function', () => {
-    let not = [{input: [0], output: [1]},
-               {input: [1], output: [0]}];
-    testBitwise(not, 'not');
+  const not = [
+    { input: [0], output: [1] },
+    { input: [1], output: [0] }
+  ];
+  const xor = [
+    { input: [0, 0], output: [0] },
+    { input: [0, 1], output: [1] },
+    { input: [1, 0], output: [1] },
+    { input: [1, 1], output: [0] }
+  ];
+  const or = [
+    { input: [0, 0], output: [0] },
+    { input: [0, 1], output: [1] },
+    { input: [1, 0], output: [1] },
+    { input: [1, 1], output: [1] }
+  ];
+  const and = [
+    { input: [0, 0], output: [0] },
+    { input: [0, 1], output: [0] },
+    { input: [1, 0], output: [0] },
+    { input: [1, 1], output: [1] }
+  ];
+  describe('sigmoid', () => {
+    it('NOT function', () => {
+      testBitwise(not, 'sigmoid', 'not');
+    });
+
+    it('XOR function', () => {
+      testBitwise(xor, 'sigmoid', 'xor');
+    });
+
+    it('OR function', () => {
+      testBitwise(or, 'sigmoid', 'or');
+    });
+
+    it('AND function', () => {
+      testBitwise(and, 'sigmoid', 'and');
+    });
   });
 
-  it('XOR function', () => {
-    let xor = [{input: [0, 0], output: [0]},
-               {input: [0, 1], output: [1]},
-               {input: [1, 0], output: [1]},
-               {input: [1, 1], output: [0]}];
-    testBitwise(xor, 'xor');
+  describe('tanh', () => {
+    it('NOT function', () => {
+      testBitwise(not, 'tanh', 'not');
+    });
+
+    it('XOR function', () => {
+      testBitwise(xor, 'tanh', 'xor');
+    });
+
+    it('OR function', () => {
+      testBitwise(or, 'tanh', 'or');
+    });
+
+    it('AND function', () => {
+      testBitwise(and, 'tanh', 'and');
+    });
   });
 
-  it('OR function', () => {
-    let or = [{input: [0, 0], output: [0]},
-              {input: [0, 1], output: [1]},
-              {input: [1, 0], output: [1]},
-              {input: [1, 1], output: [1]}];
-    testBitwise(or, 'or');
+  describe('relu', () => {
+    it('NOT function', () => {
+      testBitwise(not, 'relu', 'not');
+    });
+
+    it('XOR function', () => {
+      testBitwise(xor, 'relu', 'xor');
+    });
+
+    it('OR function', () => {
+      testBitwise(or, 'relu', 'or');
+    });
+
+    it('AND function', () => {
+      testBitwise(and, 'relu', 'and');
+    });
   });
 
-  it('AND function', () => {
-    let and = [{input: [0, 0], output: [0]},
-               {input: [0, 1], output: [0]},
-               {input: [1, 0], output: [0]},
-               {input: [1, 1], output: [1]}];
-    testBitwise(and, 'and');
+  describe('leaky-relu', () => {
+    it('NOT function', () => {
+      testBitwise(not, 'leaky-relu', 'not');
+    });
+
+    it('XOR function', () => {
+      testBitwise(xor, 'leaky-relu', 'xor');
+    });
+
+    it('OR function', () => {
+      testBitwise(or, 'leaky-relu', 'or');
+    });
+
+    it('AND function', () => {
+      testBitwise(and, 'leaky-relu', 'and');
+    });
   });
 });
